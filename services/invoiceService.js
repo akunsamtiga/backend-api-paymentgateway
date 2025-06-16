@@ -4,7 +4,7 @@ const Transaction = require('../models/Transaction');
 const { createInvoiceSchema } = require('../validators/paymentValidator');
 
 async function createInvoiceService(data) {
-  // ✅ Validasi
+  // Validasi
   const { error } = createInvoiceSchema.validate(data);
   if (error) throw new Error(error.details[0].message);
 

@@ -13,12 +13,11 @@ const auth = (roles = []) => {
       const token = authHeader.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // 🔐 Role-based access control (opsional)
       if (roles.length && !roles.includes(decoded.role)) {
         return res.status(403).json({ error: 'Akses ditolak' });
       }
 
-      req.user = decoded; // Inject user ke dalam request
+      req.user = decoded; 
       next();
     } catch (err) {
       return res.status(401).json({ error: 'Token tidak valid' });

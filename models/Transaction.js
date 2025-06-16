@@ -2,7 +2,7 @@
 const mongoose = require('mongoose');
 
 const transactionSchema = new mongoose.Schema({
-  user_id: { type: String, required: true }, // ✅ Tambahan
+  user_id: { type: String, required: true }, 
   payment_id: String,
   invoice_id: String,
   order_id: String,

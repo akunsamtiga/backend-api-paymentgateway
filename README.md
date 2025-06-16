@@ -235,17 +235,3 @@ Log mencakup: event `payment_finished`, email tujuan, order\_id, waktu, dst.
 
 ---
 
-## ✅ Flow Diagram
-
-```txt
-[FE Login] ---> /auth/login ---> JWT
-
-[FE Invoice] ---> /payment/create ---> Simpan DB + Kirim ke NowPayments
-
-[NowPayments Webhook] ---> /payment/webhook
-     ⤷ Verifikasi Signature
-     ⤷ Update status
-     ⤷ Kirim email + Log
-```
-
----

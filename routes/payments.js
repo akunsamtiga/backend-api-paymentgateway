@@ -5,10 +5,8 @@ const paymentController = require('../controllers/paymentController');
 const Transaction = require('../models/Transaction');
 const auth = require('../middleware/authMiddleware');
 
-// 🧾 Endpoint untuk membuat invoice (dengan otentikasi)
 router.post('/create', auth(), paymentController.createInvoice);
 
-// 📜 Endpoint riwayat transaksi
 router.get('/history', auth(), async (req, res) => {
   try {
     const { email, status, order_id, page = 1, limit = 10 } = req.query;
