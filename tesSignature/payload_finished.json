@@ -1,0 +1,13 @@
+{
+  "_id": "684f9ca96685ee57ab146e70",
+  "user_id": "684d5a77aa42769e9c6129b7",
+  "payment_id": "5173176063",
+  "invoice_id": "5312769951",
+  "order_id": "INV-1750047913292",
+  "order_description": "Invoice dari admin panel",
+  "price_amount": 76,
+  "price_currency": "USD",
+  "payment_status": "finished",
+  "invoice_url": "https://nowpayments.io/payment/?iid=5312769951",
+  "customer_email": "aryasis87@gmail.com"
+}
