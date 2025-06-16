@@ -31,6 +31,9 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+app.get('/', (req, res) => {
+  res.send('Backend sedang berjalan.');
+});
 // Routes
 app.use('/api/payment', paymentRoutes);
 app.use('/api', webhookRoutes);
