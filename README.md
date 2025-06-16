@@ -1,4 +1,4 @@
-Tentu, Sanzy! Berikut adalah **dokumentasi lengkap** (`README.md`) proyek pembayaran crypto kamu dengan sistem invoice + webhook, lengkap dengan struktur folder, endpoint, dan contoh request/response.
+Berikut adalah **dokumentasi lengkap** (`README.md`) proyek pembayaran crypto kamu dengan sistem invoice + webhook, lengkap dengan struktur folder, endpoint, dan contoh request/response.
 
 ---
 
