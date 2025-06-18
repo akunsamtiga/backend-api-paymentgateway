@@ -1,0 +1,13 @@
+        {
+            "_id": "685276ef7ee20c98400ff675",
+            "user_id": "685275f97ee20c98400ff672",
+            "payment_id": "4348462671",
+            "invoice_id": "5184578541",
+            "order_id": "00001",
+            "order_description": "1000 credits",
+            "price_amount": 1,
+            "price_currency": "USD",
+            "payment_status": "finished",
+            "invoice_url": "https://nowpayments.io/payment/?iid=5184578541",
+            "customer_email": "srxs.zevez.dev@gmail.com",
+        }
