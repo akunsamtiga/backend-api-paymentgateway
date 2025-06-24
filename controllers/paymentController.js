@@ -1,49 +1,141 @@
-// controller/paymentController.js
-const { createInvoiceService } = require('../services/invoiceService');
+// controllers/paymentController.js
+const { v4: uuidv4 } = require('uuid');
+const axios = require('axios');
 const Transaction = require('../models/Transaction');
+const BotUser = require('../models/BotUser');
+const { createInvoiceService } = require('../services/invoiceService');
+const logger = require('../utils/logger');
 
 exports.createInvoice = async (req, res) => {
   try {
-    const userId = req.user?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: 'User tidak terautentikasi' });
-    }
-
-    const BASE_URL = process.env.BASE_URL || 'https://yourdomain.com';
+    const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+    const user_id = req.body.user_id || 'anonymous';
 
     const invoice = await createInvoiceService({
       ...req.body,
-      user_id: userId,
+      user_id,
       ipn_callback_url: `${BASE_URL}/api/payment/webhook`,
       success_url: `${BASE_URL}/payment/success`,
       cancel_url: `${BASE_URL}/payment/cancel`
     });
 
-    res.json(invoice);
+    logger.info({ event: 'create_invoice', user_id, invoice_id: invoice.id });
+    return res.json(invoice);
   } catch (err) {
-    console.error('❌ Error createInvoice:', err.message);
-    res.status(400).json({ error: err.message });
+    logger.error('create_invoice_error', err.message);
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+exports.createInvoiceFromTelegram = async (req, res) => {
+  try {
+    const { telegram_id, nominal } = req.body;
+    if (!telegram_id || !nominal) {
+      return res.status(400).json({ error: 'telegram_id and nominal must be filled in' });
+    }
+
+    const user = await BotUser.findOne({ telegram_id });
+    if (!user) {
+      return res.status(404).json({ error: 'User has not bind XSID' });
+    }
+
+    const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+    const orderId = `XSID-${uuidv4().slice(0, 8)}`;
+    let emailSafe = `${user.xsid.replace(/[^a-zA-Z0-9]/g, '')}@gmail.com`;
+    if (emailSafe.length > 50) {
+      emailSafe = emailSafe.slice(0, 40) + '@gmail.com';
+    }
+
+    const payload = {
+      price_amount: nominal,
+      price_currency: 'USD',
+      order_id: orderId,
+      order_description: `Top up XSID ${user.xsid}`,
+      ipn_callback_url: `${BASE_URL}/api/payment/webhook`,
+      customer_email: emailSafe
+    };
+
+    const headers = {
+      'x-api-key': process.env.NOWPAYMENTS_API_KEY,
+      'Content-Type': 'application/json'
+    };
+
+    const invoiceResponse = await axios.post(
+      'https://api.nowpayments.io/v1/invoice',
+      payload,
+      { headers }
+    );
+
+    const invoice = invoiceResponse.data;
+
+    await Transaction.create({
+      user_id: 'telegram',
+      telegram_id,
+      xsid: user.xsid,
+      payment_id: invoice.token_id,
+      invoice_id: invoice.id,
+      order_id: invoice.order_id,
+      order_description: invoice.order_description,
+      price_amount: invoice.price_amount,
+      price_currency: invoice.price_currency,
+      invoice_url: invoice.invoice_url,
+      customer_email: emailSafe,
+      payment_status: 'waiting',
+      created_at: new Date(),
+      updated_at: new Date()
+    });
+
+    logger.info({
+      event: 'telegram_invoice_created',
+      telegram_id,
+      xsid: user.xsid,
+      invoice_id: invoice.id,
+      nominal
+    });
+
+    return res.json(invoice);
+  } catch (err) {
+    const detail = err.response?.data || err.message;
+    logger.error('telegram_create_invoice_error', detail);
+    return res.status(500).json({ error: detail });
   }
 };
 
 exports.getInvoiceDetail = async (req, res) => {
   try {
     const { invoice_id } = req.params;
-    const { userId, role } = req.user;
-
     const tx = await Transaction.findOne({ invoice_id });
 
-    if (!tx) return res.status(404).json({ message: 'Invoice tidak ditemukan' });
+    if (!tx) return res.status(404).json({ message: 'Invoice not found' });
 
-    // 🚫 Batasi akses jika bukan admin
-    if (role !== 'admin' && tx.user_id !== userId) {
-      return res.status(403).json({ message: 'Tidak punya akses ke invoice ini' });
-    }
-
-    res.json(tx);
+    return res.json(tx);
   } catch (err) {
-    console.error('❌ Gagal mengambil detail invoice:', err);
-    res.status(500).json({ message: 'Gagal mengambil detail invoice' });
+    logger.error('get_invoice_detail_error', err.message);
+    return res.status(500).json({ message: 'Failed to fetch invoice details' });
+  }
+};
+
+exports.getTransactionHistory = async (req, res) => {
+  try {
+    const { email, status, order_id, page = 1, limit = 10 } = req.query;
+
+    const query = {};
+    if (email) query.customer_email = email;
+    if (status) query.payment_status = status;
+    if (order_id) query.order_id = order_id;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [transactions, total] = await Promise.all([
+      Transaction.find(query).sort({ created_at: -1 }).skip(skip).limit(parseInt(limit)),
+      Transaction.countDocuments(query)
+    ]);
+
+    logger.info({ event: 'get_transaction_history', total });
+    return res.json({ transactions, total, page: +page, limit: +limit });
+  } catch (err) {
+    logger.error('get_transaction_history_error', err.message);
+    return res.status(500).json({ error: 'Failed to retrieve transaction history' });
   }
 };
 
@@ -53,7 +145,7 @@ exports.getAdminStats = async (req, res) => {
       Transaction.countDocuments(),
       Transaction.find({ payment_status: 'finished' }),
       Transaction.countDocuments({ payment_status: 'waiting' }),
-      Transaction.countDocuments({ payment_status: 'failed' }),
+      Transaction.countDocuments({ payment_status: 'failed' })
     ]);
 
     const total_paid = finishedTx.reduce((acc, tx) => {
@@ -61,14 +153,94 @@ exports.getAdminStats = async (req, res) => {
       return acc + (isNaN(amount) ? 0 : amount);
     }, 0);
 
-    res.json({
+    return res.json({
       total_invoices,
       total_paid: total_paid.toFixed(2),
       pending,
       failed
     });
   } catch (err) {
-    console.error('❌ Gagal mengambil statistik admin:', err);
-    res.status(500).json({ message: 'Gagal mengambil statistik admin' });
+    logger.error('get_admin_stats_error', err.message);
+    return res.status(500).json({ message: 'Failed to fetch admin statistics' });
+  }
+};
+
+// GET /payment/admin/daily
+exports.getDailyReport = async (req, res) => {
+  try {
+    const Transaction = require('../models/Transaction');
+    const today = new Date();
+    const last7Days = new Date(today);
+    last7Days.setDate(today.getDate() - 6);
+
+    const result = await Transaction.aggregate([
+      {
+        $match: {
+          created_at: { $gte: new Date(last7Days) }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$created_at' }
+          },
+          count: { $sum: 1 },
+          total: {
+            $sum: {
+              $cond: [
+                { $eq: ['$payment_status', 'finished'] },
+                { $toDouble: '$price_amount' },
+                0
+              ]
+            }
+          }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    const data = result.map(d => ({
+      date: d._id,
+      count: d.count,
+      total: d.total
+    }));
+
+    res.json(data);
+  } catch (err) {
+    console.error('❌ Failed to fetch daily report:', err);
+    res.status(500).json({ message: 'Failed to fetch daily report' });
+  }
+};
+
+exports.getSummary = async (req, res) => {
+  try {
+    const { email, start_date, end_date } = req.query;
+    const query = {};
+
+    if (email) query.customer_email = email;
+    if (start_date || end_date) {
+      query.created_at = {};
+      if (start_date) query.created_at.$gte = new Date(start_date);
+      if (end_date) {
+        const end = new Date(end_date);
+        end.setDate(end.getDate() + 1); 
+        query.created_at.$lt = end;
+      }
+    }
+
+    const transactions = await Transaction.find(query);
+    const total_paid = transactions.reduce((acc, tx) => {
+      return acc + (tx.payment_status === 'finished' ? parseFloat(tx.price_amount) : 0);
+    }, 0);
+
+    res.json({
+      total: transactions.length,
+      total_paid: total_paid.toFixed(2),
+      email: email || 'All',
+      date_range: { start_date, end_date }
+    });
+  } catch (err) {
+    console.error('❌ Failed to retrieve summary:', err);
+    res.status(500).json({ error: 'Failed to retrieve summary' });
   }
 };

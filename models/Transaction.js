@@ -16,6 +16,12 @@ const transactionSchema = new mongoose.Schema({
   customer_email: String,
   created_at: Date,
   updated_at: Date,
+  telegram_id: String,
+  xsid: String,
 });
+
+transactionSchema.index({ invoice_id: 1 });
+transactionSchema.index({ payment_id: 1 });
+transactionSchema.index({ created_at: -1 });
 
 module.exports = mongoose.model('Transaction', transactionSchema);

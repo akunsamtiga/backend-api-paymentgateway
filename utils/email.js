@@ -10,7 +10,7 @@ const transporter = nodemailer.createTransport({
 });
 
 exports.sendPaymentSuccessEmail = async ({ to, subject, text }) => {
-  console.log('📨 Preparing to send email to:', to);
+  console.log('📨 Getting ready to send email to:', to);
   try {
     const info = await transporter.sendMail({
       from: `"Sanzy Pay" <${process.env.EMAIL_USER}>`,
@@ -18,8 +18,8 @@ exports.sendPaymentSuccessEmail = async ({ to, subject, text }) => {
       subject,
       text
     });
-    console.log('✅ Email terkirim:', info.response);
+    console.log('✅ Email sent:', info.response);
   } catch (err) {
-    console.error('❌ Gagal kirim email:', err.message);
+    console.error('❌ Failed to send email:', err.message);
   }
 };

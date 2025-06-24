@@ -9,7 +9,7 @@ module.exports = function verifyWebhookSignature(req) {
 
   const computedSig = crypto
     .createHmac('sha512', secret)
-    .update(req.body) // raw buffer
+    .update(req.body)
     .digest('hex');
 
   return signature === computedSig;

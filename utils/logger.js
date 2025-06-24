@@ -10,17 +10,20 @@ if (!fs.existsSync('logs')) {
 const logger = createLogger({
   format: format.combine(
     format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    format.json()
+    format.printf(({ timestamp, level, message }) => {
+      return `${timestamp} [${level.toUpperCase()}] ${message}`;
+    })
   ),
   transports: [
     new DailyRotateFile({
       filename: 'logs/%DATE%-transactions.log',
       datePattern: 'YYYY-MM-DD',
-      zippedArchive: true,         
-      maxSize: '20m',              
-      maxFiles: '14d',             
-      level: 'info'              
-    })
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '14d',
+      level: 'info'
+    }),
+    new transports.Console() 
   ]
 });
 

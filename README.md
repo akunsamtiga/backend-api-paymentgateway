@@ -1,237 +1,155 @@
-Berikut adalah **dokumentasi lengkap** (`README.md`) proyek pembayaran crypto kamu dengan sistem invoice + webhook, lengkap dengan struktur folder, endpoint, dan contoh request/response.
+
+# 💸 SanzyPay — Payment Gateway via NowPayments + Telegram Bot
+
+SanzyPay adalah sistem gateway pembayaran kripto berbasis [NowPayments.io](https://nowpayments.io), terintegrasi dengan Bot Telegram dan backend Node.js tanpa autentikasi.
 
 ---
 
-# 💸 Sanzy Crypto Payment Gateway
+## 🚀 Fitur Utama
 
-API backend sederhana untuk menerima pembayaran cryptocurrency via [NowPayments.io](https://nowpayments.io). Mendukung pembuatan invoice, integrasi webhook, autentikasi JWT, logging, dan notifikasi email.
+- ✅ Pembuatan invoice (web/telegram)
+- ✅ Integrasi pembayaran kripto via NowPayments
+- ✅ Webhook otomatis: update status + notifikasi Telegram + refill XSID
+- ✅ Dashboard Admin (tanpa login)
+- ✅ Riwayat transaksi publik
+- ✅ Statistik transaksi
+- ✅ Email notifikasi sukses
+- ✅ Tanpa autentikasi — cocok untuk layanan publik/Telegram Bot
 
 ---
 
-## 📂 Struktur Proyek
+## 📦 Teknologi
+
+- **Backend:** Express.js + MongoDB
+- **Bot:** `node-telegram-bot-api`
+- **Email:** Nodemailer (Gmail)
+- **Webhook Signature:** HMAC SHA512 (NowPayments)
+- **Rate Limiter:** express-rate-limit
+- **Logger:** winston + daily-rotate
+
+---
+
+## ⚙️ Instalasi
+
+1. Clone repo ini:
+
+```bash
+git clone https://github.com/namamu/sanzypay.git
+cd sanzypay
+````
+
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Buat file `.env`:
+
+```env
+NOWPAYMENTS_API_KEY=xxx
+MONGODB_URI=mongodb+srv://...
+WEBHOOK_SECRET=...
+EMAIL_USER=example@gmail.com
+EMAIL_PASS=app-password
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_ADMIN_ID=123456789
+XSID_API_URL=https://srxsnet.com/xs
+BASE_URL=http://localhost:3000
+```
+
+4. Jalankan backend:
+
+```bash
+npm run dev
+```
+
+5. Jalankan bot:
+
+```bash
+node telegram/bot.js
+```
+
+---
+
+## 🌐 API Endpoint
+
+Semua endpoint bersifat **publik** dan **tidak memerlukan autentikasi**.
+
+| Metode | Endpoint                       | Deskripsi                           |
+| ------ | ------------------------------ | ----------------------------------- |
+| POST   | `/api/payment/create`          | Buat invoice manual (via panel/web) |
+| POST   | `/api/payment/telegram-create` | Buat invoice dari Telegram bot      |
+| POST   | `/api/payment/webhook`         | Webhook dari NowPayments            |
+| GET    | `/api/payment/history`         | Lihat riwayat transaksi             |
+| GET    | `/api/payment/admin/stats`     | Statistik umum                      |
+| GET    | `/api/payment/:invoice_id`     | Detail invoice                      |
+
+> 📎 Dokumentasi lengkap endpoint ada di: `docs/api.md`
+
+---
+
+## 🤖 Telegram Bot
+
+Bot menggunakan polling & mendukung:
+
+* `/start` — sambutan
+* `/bind xsid-xxx` — hubungkan Telegram ke akun XSID
+* `/topup <nominal>` — buat invoice langsung via NowPayments
+
+---
+
+## 🔐 Webhook Signature (NowPayments)
+
+Untuk keamanan, webhook divalidasi dengan `x-nowpayments-sig` (HMAC-SHA512).
+
+Cek contoh uji coba signature manual:
+
+```bash
+node tesSignature/signature_finished.js
+```
+
+---
+
+## 📊 Dashboard Admin
+
+Frontend dashboard disediakan (tanpa login) untuk:
+
+* Melihat statistik
+* Membuat invoice
+* Riwayat transaksi
+* Lihat detail invoice
+
+---
+
+## 📁 Struktur Folder
 
 ```
 .
 ├── app.js
-├── .env
-├── .gitignore
+├── telegram/
+│   └── bot.js
 ├── routes/
-│   ├── payments.js
-│   ├── webhook.js
-│   ├── admin.js
-│   └── auth.js
 ├── controllers/
-│   ├── paymentController.js
-│   └── webhookController.js
-├── models/
-│   ├── Transaction.js
-│   └── User.js
+├── services/
 ├── utils/
-│   ├── hash.js
-│   ├── logger.js
-│   ├── email.js
-│   ├── verifyWebhook.js
-│   └── nowpayments.js
-├── validators/
-│   └── paymentValidator.js
+├── models/
 ├── middleware/
-│   └── authMiddleware.js
-├── config/
-│   └── nowpayments.js
-└── seedAdmin.js
+├── docs/
+│   └── api.md
+├── tesSignature/
+└── .env
 ```
 
 ---
 
-## 🔐 Autentikasi
+## 📞 Kontak
 
-Login untuk mendapatkan JWT token:
-
-### `POST /api/auth/login`
-
-**Body:**
-
-```json
-{
-  "email": "admin@sanzy.com",
-  "password": "admin123"
-}
-```
-
-**Response:**
-
-```json
-{
-  "token": "your_jwt_token"
-}
-```
-
-Gunakan token ini sebagai `Authorization: Bearer <token>` pada endpoint lainnya.
+Pengembang: **Sanzy ([sanzyxsid@gmail.com](mailto:sanzyxsid@gmail.com))**
+Proyek freelance via Telegram: `@SanzyXSID`
 
 ---
 
-## 💳 Invoice / Payment
+## 📝 Lisensi
 
-### `POST /api/payment/create`
-
-Membuat invoice baru.
-
-**Header:**
-
-```
-Authorization: Bearer <JWT_TOKEN>
-```
-
-**Body:**
-
-```json
-{
-  "user_id": "661ff...",
-  "price_amount": 100,
-  "price_currency": "USD",
-  "order_id": "ORDER001",
-  "order_description": "Topup saldo",
-  "ipn_callback_url": "https://yourdomain.com/api/payment/webhook",
-  "success_url": "https://yourdomain.com/payment/success",
-  "cancel_url": "https://yourdomain.com/payment/cancel",
-  "customer_email": "user@example.com"
-}
-```
-
-**Response:**
-
-```json
-{
-  "id": "invoice_id",
-  "order_id": "ORDER001",
-  "invoice_url": "https://nowpayments.io/invoice/abc123",
-  ...
-}
-```
-
----
-
-### `GET /api/payment/history`
-
-Melihat riwayat transaksi user (atau semua jika admin).
-
-**Query Params:**
-
-* `email` (opsional)
-* `status` (opsional) → `waiting`, `confirmed`, `finished`, `expired`
-* `order_id` (opsional)
-* `page`, `limit` (pagination)
-
-**Header:**
-
-```
-Authorization: Bearer <JWT_TOKEN>
-```
-
-**Response:**
-
-```json
-{
-  "transactions": [...],
-  "total": 12,
-  "page": 1,
-  "limit": 10
-}
-```
-
----
-
-## 🧾 Admin Only
-
-### `GET /api/admin/transactions`
-
-Melihat semua transaksi di sistem (khusus admin).
-
-**Header:**
-
-```
-Authorization: Bearer <JWT_TOKEN>
-```
-
----
-
-## 🔁 Webhook NowPayments
-
-### `POST /api/payment/webhook`
-
-Menerima webhook dari NowPayments saat status pembayaran berubah.
-
-**Header:**
-
-```
-x-nowpayments-sig: HMAC_SIGNATURE
-Content-Type: application/json
-```
-
-**Body (raw JSON):**
-
-```json
-{
-  "payment_id": "123",
-  "invoice_id": "abc",
-  "payment_status": "finished",
-  "pay_address": "1BitcoinAddress",
-  "pay_currency": "BTC"
-}
-```
-
-📌 Signature diverifikasi dengan `HMAC SHA512` berdasarkan `process.env.WEBHOOK_SECRET`. Pastikan header `x-nowpayments-sig` dikirim.
-
-Jika pembayaran `finished`, sistem:
-
-* Update status transaksi di database
-* Kirim email ke `customer_email`
-* Log aktivitas via Winston
-
----
-
-## 🔧 Konfigurasi `.env`
-
-Contoh `.env`:
-
-```
-PORT=3000
-MONGODB_URI=mongodb+srv://...yourMongoString...
-JWT_SECRET=your_jwt_secret
-NOWPAYMENTS_API_KEY=your_api_key
-EMAIL_USER=your@email.com
-EMAIL_PASS=your_app_password
-WEBHOOK_SECRET=your_webhook_secret
-```
-
----
-
-## 📥 Seeding Admin
-
-Untuk membuat akun admin default:
-
-```bash
-node seedAdmin.js
-```
-
-Akun default:
-
-```bash
-email: admin@sanzy.com
-password: admin123
-```
-
----
-
-## 🧾 Log & Monitoring
-
-Log transaksi disimpan harian (rotasi otomatis) di folder `logs/`:
-
-```bash
-logs/2025-06-14-transactions.log.gz
-```
-
-Log mencakup: event `payment_finished`, email tujuan, order\_id, waktu, dst.
-
----
-
+MIT License — bebas digunakan & dimodifikasi.

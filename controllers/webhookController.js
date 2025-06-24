@@ -1,18 +1,19 @@
-// controllers/webhookController.js
+// controller/webhookController.js
+const axios = require('axios');
 const Transaction = require('../models/Transaction');
-const { sendPaymentSuccessEmail } = require('../utils/email'); // ✅ fix import
 const logger = require('../utils/logger');
-const verifyWebhookSignature = require('../utils/verifyWebhook'); // ✅ import verify
+const verifyWebhookSignature = require('../utils/verifyWebhook');
+const sendTelegram = require('../utils/sendTelegram');
+const { sendPaymentSuccessEmail } = require('../utils/email');
 
-const handleWebhook = async (req, res) => {
-  // ✅ Verifikasi Signature
+exports.handleWebhook = async (req, res) => {
   if (!verifyWebhookSignature(req)) {
-    console.warn('❌ Invalid signature - rejected webhook');
+    logger.warn('❌ Invalid webhook signature');
     return res.status(401).json({ error: 'Unauthorized signature' });
   }
 
   try {
-    const payload = JSON.parse(req.body.toString()); // raw buffer ke string
+    const payload = JSON.parse(req.body.toString());
 
     const {
       payment_id,
@@ -22,13 +23,18 @@ const handleWebhook = async (req, res) => {
       pay_currency
     } = payload;
 
-    console.log('📩 Webhook payload diterima:', payload);
+    logger.info({ event: 'webhook_received', payment_id, invoice_id, payment_status });
 
     const transaction = await Transaction.findOne({ payment_id, invoice_id });
 
     if (!transaction) {
-      console.error('❌ Transaksi tidak ditemukan.');
-      return res.status(404).json({ error: 'Transaksi tidak ditemukan' });
+      logger.error('❌ Transaction not found');
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    if (transaction.payment_status === 'finished') {
+      logger.warn('⚠️ Webhook has been processed previously.');
+      return res.json({ success: true, message: 'Already processed' });
     }
 
     transaction.payment_status = payment_status;
@@ -37,35 +43,88 @@ const handleWebhook = async (req, res) => {
     transaction.updated_at = new Date();
     await transaction.save();
 
-    console.log(`📦 Status pembayaran: ${payment_status}`);
+    logger.info({
+      event: 'transaction_updated',
+      invoice_id,
+      status: payment_status,
+      time: transaction.updated_at
+    });
 
     if (payment_status === 'finished') {
-      if (transaction.customer_email) {
-        console.log(`✅ Mengirim email ke: ${transaction.customer_email}`);
-        await sendPaymentSuccessEmail({
-          to: transaction.customer_email,
-          subject: 'Pembayaran Berhasil',
-          text: `Halo,\n\nPembayaran Anda dengan order ID ${transaction.order_id} sebesar ${transaction.price_amount} ${transaction.price_currency} telah berhasil.\n\nTerima kasih telah menggunakan layanan kami.`
-        });
+      const baseAmount = parseFloat(transaction.price_amount);
+      const bonusPercentage = 10;
+      const totalUSD = baseAmount + (baseAmount * bonusPercentage / 100);
 
+      const refillPayload = {
+        id: transaction.xsid,
+        amount: Math.round(totalUSD * 1000), // $1 = 1000 poin
+        extra: bonusPercentage,
+        operator: 'nowpayments',
+        is_operator_funds: true
+      };
+
+      try {
+        const refillRes = await axios.post(`${process.env.XSID_API_URL}/refillXSID`, refillPayload);
         logger.info({
-          event: 'payment_finished',
-          order_id: transaction.order_id,
-          payment_id: transaction.payment_id,
-          email: transaction.customer_email,
-          time: new Date()
+          event: 'xsid_refill_success',
+          xsid: transaction.xsid,
+          amount: refillPayload.amount,
+          response: refillRes.data
         });
-      } else {
-        console.warn('⚠️ Email customer tidak tersedia.');
+      } catch (err) {
+        logger.error({
+          event: 'xsid_refill_failed',
+          xsid: transaction.xsid,
+          error: err.response?.data || err.message
+        });
+      }
+
+      try {
+        const message = `✅ Top up XSID ${transaction.xsid} of $${baseAmount} successful! (+${bonusPercentage}% bonus)`;
+        if (transaction.telegram_id) {
+          await sendTelegram(transaction.telegram_id, message);
+        }
+
+        if (process.env.TELEGRAM_ADMIN_ID) {
+          await sendTelegram(
+            process.env.TELEGRAM_ADMIN_ID,
+            `💸 User ${transaction.xsid} has topped up $${baseAmount} via NowPayments.`
+          );
+        }
+      } catch (err) {
+        logger.warn({
+          event: 'telegram_notification_failed',
+          error: err.message
+        });
+      }
+
+      if (transaction.customer_email) {
+        try {
+          await sendPaymentSuccessEmail({
+            to: transaction.customer_email,
+            subject: 'Payment Successful',
+            text: `Halo,\n\nYour payment with order ID ${transaction.order_id} of ${transaction.price_amount} ${transaction.price_currency} has been successful.\n\nThank you for using our services.`
+          });
+
+          logger.info({
+            event: 'email_sent',
+            email: transaction.customer_email,
+            order_id: transaction.order_id,
+            time: new Date()
+          });
+        } catch (err) {
+          logger.warn({
+            event: 'email_failed',
+            error: err.message,
+            email: transaction.customer_email
+          });
+        }
       }
     }
 
-    res.json({ success: true });
-
+    return res.json({ success: true });
   } catch (err) {
-    console.error('❌ Webhook error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    logger.error('❌ Webhook handler error', err.message);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
-
-module.exports = { handleWebhook };
