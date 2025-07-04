@@ -9,14 +9,14 @@ const logger = require('../utils/logger');
 exports.createInvoice = async (req, res) => {
   try {
     const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
-    const user_id = req.body.user_id || 'anonymous';
+    const user_id  = req.body.user_id || 'anonymous';
 
     const invoice = await createInvoiceService({
       ...req.body,
       user_id,
-      ipn_callback_url: `${BASE_URL}/api/payment/webhook`,
-      success_url: `${BASE_URL}/payment/success`,
-      cancel_url: `${BASE_URL}/payment/cancel`
+      ipn_callback_url : `${BASE_URL}/api/payment/webhook`,
+      success_url      : `${BASE_URL}/payment/success`,
+      cancel_url       : `${BASE_URL}/payment/cancel`
     });
 
     logger.info({ event: 'create_invoice', user_id, invoice_id: invoice.id });
@@ -26,6 +26,7 @@ exports.createInvoice = async (req, res) => {
     return res.status(400).json({ error: err.message });
   }
 };
+
 
 exports.createInvoiceFromTelegram = async (req, res) => {
   try {
@@ -39,57 +40,59 @@ exports.createInvoiceFromTelegram = async (req, res) => {
       return res.status(404).json({ error: 'User has not bind XSID' });
     }
 
+    /* ---------- Membuat invoice di NowPayments ---------- */
     const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
-    const orderId = `XSID-${uuidv4().slice(0, 8)}`;
-    let emailSafe = `${user.xsid.replace(/[^a-zA-Z0-9]/g, '')}@gmail.com`;
-    if (emailSafe.length > 50) {
-      emailSafe = emailSafe.slice(0, 40) + '@gmail.com';
+    const orderId  = `XSID-${uuidv4().slice(0, 8)}`;
+
+    let emailSafe = user.email;
+    if (!emailSafe || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailSafe)) {
+      emailSafe = `${user.xsid.replace(/[^a-zA-Z0-9]/g, '')}@gmail.com`.slice(0, 50);
     }
 
     const payload = {
-      price_amount: nominal,
-      price_currency: 'USD',
-      order_id: orderId,
-      order_description: `Top up XSID ${user.xsid}`,
-      ipn_callback_url: `${BASE_URL}/api/payment/webhook`,
-      customer_email: emailSafe
-    };
-
-    const headers = {
-      'x-api-key': process.env.NOWPAYMENTS_API_KEY,
-      'Content-Type': 'application/json'
+      price_amount      : nominal,
+      price_currency    : 'USD',
+      order_id          : orderId,
+      order_description : `Top up XSID ${user.xsid}`,
+      ipn_callback_url  : `${BASE_URL}/api/payment/webhook`,
+      customer_email    : emailSafe
     };
 
     const invoiceResponse = await axios.post(
       'https://api.nowpayments.io/v1/invoice',
       payload,
-      { headers }
+      {
+        headers: {
+          'x-api-key'   : process.env.NOWPAYMENTS_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      }
     );
 
     const invoice = invoiceResponse.data;
 
     await Transaction.create({
-      user_id: 'telegram',
+      user_id           : 'telegram',
       telegram_id,
-      xsid: user.xsid,
-      payment_id: invoice.token_id,
-      invoice_id: invoice.id,
-      order_id: invoice.order_id,
-      order_description: invoice.order_description,
-      price_amount: invoice.price_amount,
-      price_currency: invoice.price_currency,
-      invoice_url: invoice.invoice_url,
-      customer_email: emailSafe,
-      payment_status: 'waiting',
-      created_at: new Date(),
-      updated_at: new Date()
+      xsid              : user.xsid,
+      payment_id        : invoice.token_id,
+      invoice_id        : invoice.id,
+      order_id          : invoice.order_id,
+      order_description : invoice.order_description,
+      price_amount      : invoice.price_amount,
+      price_currency    : invoice.price_currency,
+      invoice_url       : invoice.invoice_url,
+      customer_email    : emailSafe,
+      payment_status    : 'waiting',
+      created_at        : new Date(),
+      updated_at        : new Date()
     });
 
     logger.info({
-      event: 'telegram_invoice_created',
+      event       : 'telegram_invoice_created',
       telegram_id,
-      xsid: user.xsid,
-      invoice_id: invoice.id,
+      xsid        : user.xsid,
+      invoice_id  : invoice.id,
       nominal
     });
 
@@ -100,6 +103,7 @@ exports.createInvoiceFromTelegram = async (req, res) => {
     return res.status(500).json({ error: detail });
   }
 };
+
 
 exports.getInvoiceDetail = async (req, res) => {
   try {
@@ -244,3 +248,25 @@ exports.getSummary = async (req, res) => {
     res.status(500).json({ error: 'Failed to retrieve summary' });
   }
 };
+
+exports.getBalance = async (req, res) => {
+  const { telegram_id } = req.query;
+  if (!telegram_id) return res.status(400).json({ error: 'telegram_id is required' });
+
+  try {
+    const mgc = await axios.get(
+      `${process.env.MAIN_API_URL || 'https://mgc.bot'}/api/user/${telegram_id}/balance`,
+      { headers: { 'x-internal-api-key': process.env.INTERNAL_MASTER_KEY } }
+    );
+
+    const credits = mgc.data.credits ?? mgc.data.balance ?? 0;
+    return res.json({ telegram_id, credits: Number(credits) });
+  } catch (err) {
+    console.error('❌ Failed to fetch balance from MGC:', err.response?.data || err.message);
+    if (err.response?.status === 404) {
+      return res.status(404).json({ error: 'User not found on MGCBot' });
+    }
+    return res.status(500).json({ error: 'Failed to get balance from MGC' });
+  }
+};
+

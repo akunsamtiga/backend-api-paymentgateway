@@ -1,2 +1,0 @@
-{"level":"info","message":{"email":"customer@email.com","event":"payment_finished","order_id":"ORDER123","payment_id":"5173176063","time":"2025-06-14T11:51:43.350Z"},"timestamp":"2025-06-14 18:51:43"}
-{"level":"info","message":{"email":"eawow123@gmail.com","event":"payment_finished","order_id":"ORDER123456","payment_id":"5173176063","time":"2025-06-14T13:15:19.237Z"},"timestamp":"2025-06-14 20:15:19"}

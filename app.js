@@ -7,6 +7,8 @@ const rawBodyParser = require('body-parser').raw;
 
 const paymentRoutes = require('./routes/payments');
 const webhookRoutes = require('./routes/webhook');
+const keyRoutes = require('./routes/key');
+
 const { generalLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
@@ -24,6 +26,7 @@ app.get('/', (req, res) => {
 
 app.use('/api/payment', paymentRoutes);
 app.use('/api', webhookRoutes);
+app.use('/api/key', keyRoutes);
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
@@ -32,8 +35,6 @@ mongoose.connect(process.env.MONGODB_URI)
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
-
-    require('./telegram/bot');
   })
   .catch((err) => {
     console.error('❌ MongoDB connection failed:', err);

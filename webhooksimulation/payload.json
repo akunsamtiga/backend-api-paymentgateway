@@ -1,16 +1,7 @@
 {
-    "_id": "68578ac977e88aa10715653f",
-    "user_id": "tes142",
     "payment_id": "5173176063",
-    "invoice_id": "4336665889",
-    "order_id": "TEST1923",
-    "order_description": "Testing Invoice",
-    "price_amount": 5,
-    "price_currency": "USD",
+    "invoice_id": "5418758548",
     "payment_status": "finished",
-    "invoice_url": "https://nowpayments.io/payment/?iid=4336665889",
-    "customer_email": "aryasis87@gmail.com",
-    "created_at": "2025-06-22T04:47:05.926Z",
-    "updated_at": "2025-06-22T04:47:05.926Z",
-    "__v": 0
-}
+    "pay_currency": "usdt_trc20",
+    "pay_address": "xcvxdgqedasdasjdsaksdasdasfasda"
+  }

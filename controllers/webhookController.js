@@ -1,130 +1,137 @@
-// controller/webhookController.js
-const axios = require('axios');
-const Transaction = require('../models/Transaction');
-const logger = require('../utils/logger');
-const verifyWebhookSignature = require('../utils/verifyWebhook');
-const sendTelegram = require('../utils/sendTelegram');
-const { sendPaymentSuccessEmail } = require('../utils/email');
+// controllers/webhookController.js
+const axios           = require('axios');
+const Transaction     = require('../models/Transaction');
+const logger          = require('../utils/logger');
+const verifySignature = require('../utils/verifyWebhook');
+const sendTelegram    = require('../utils/sendTelegram');
 
+/* ENV helpers */
+const BACKEND_URL   = process.env.BASE_URL      || 'http://localhost:3000';
+const MGC_API_URL   = process.env.MAIN_API_URL  || 'https://mgc.bot';
+const INTERNAL_KEY  = process.env.INTERNAL_MASTER_KEY;
+
+/* ────────────────────────────────────────────────────────── */
 exports.handleWebhook = async (req, res) => {
-  if (!verifyWebhookSignature(req)) {
+  /* 1. Verifikasi HMAC header (NowPayments) */
+  if (!verifySignature(req)) {
     logger.warn('❌ Invalid webhook signature');
     return res.status(401).json({ error: 'Unauthorized signature' });
   }
 
-  try {
-    const payload = JSON.parse(req.body.toString());
+  /* 2. Parse payload */
+  const payload = JSON.parse(req.body.toString());
+  const {
+    payment_id,
+    invoice_id,
+    payment_status,
+    pay_address,
+    pay_currency
+  } = payload;
 
-    const {
-      payment_id,
-      invoice_id,
-      payment_status,
-      pay_address,
-      pay_currency
-    } = payload;
+  logger.info({ event: 'webhook_received', payment_id, invoice_id, payment_status });
 
-    logger.info({ event: 'webhook_received', payment_id, invoice_id, payment_status });
-
-    const transaction = await Transaction.findOne({ payment_id, invoice_id });
-
-    if (!transaction) {
-      logger.error('❌ Transaction not found');
-      return res.status(404).json({ error: 'Transaction not found' });
-    }
-
-    if (transaction.payment_status === 'finished') {
-      logger.warn('⚠️ Webhook has been processed previously.');
-      return res.json({ success: true, message: 'Already processed' });
-    }
-
-    transaction.payment_status = payment_status;
-    transaction.pay_address = pay_address;
-    transaction.pay_currency = pay_currency;
-    transaction.updated_at = new Date();
-    await transaction.save();
-
-    logger.info({
-      event: 'transaction_updated',
-      invoice_id,
-      status: payment_status,
-      time: transaction.updated_at
-    });
-
-    if (payment_status === 'finished') {
-      const baseAmount = parseFloat(transaction.price_amount);
-      const bonusPercentage = 10;
-      const totalUSD = baseAmount + (baseAmount * bonusPercentage / 100);
-
-      const refillPayload = {
-        id: transaction.xsid,
-        amount: Math.round(totalUSD * 1000), // $1 = 1000 poin
-        extra: bonusPercentage,
-        operator: 'nowpayments',
-        is_operator_funds: true
-      };
-
-      try {
-        const refillRes = await axios.post(`${process.env.XSID_API_URL}/refillXSID`, refillPayload);
-        logger.info({
-          event: 'xsid_refill_success',
-          xsid: transaction.xsid,
-          amount: refillPayload.amount,
-          response: refillRes.data
-        });
-      } catch (err) {
-        logger.error({
-          event: 'xsid_refill_failed',
-          xsid: transaction.xsid,
-          error: err.response?.data || err.message
-        });
-      }
-
-      try {
-        const message = `✅ Top up XSID ${transaction.xsid} of $${baseAmount} successful! (+${bonusPercentage}% bonus)`;
-        if (transaction.telegram_id) {
-          await sendTelegram(transaction.telegram_id, message);
-        }
-
-        if (process.env.TELEGRAM_ADMIN_ID) {
-          await sendTelegram(
-            process.env.TELEGRAM_ADMIN_ID,
-            `💸 User ${transaction.xsid} has topped up $${baseAmount} via NowPayments.`
-          );
-        }
-      } catch (err) {
-        logger.warn({
-          event: 'telegram_notification_failed',
-          error: err.message
-        });
-      }
-
-      if (transaction.customer_email) {
-        try {
-          await sendPaymentSuccessEmail({
-            to: transaction.customer_email,
-            subject: 'Payment Successful',
-            text: `Halo,\n\nYour payment with order ID ${transaction.order_id} of ${transaction.price_amount} ${transaction.price_currency} has been successful.\n\nThank you for using our services.`
-          });
-
-          logger.info({
-            event: 'email_sent',
-            email: transaction.customer_email,
-            order_id: transaction.order_id,
-            time: new Date()
-          });
-        } catch (err) {
-          logger.warn({
-            event: 'email_failed',
-            error: err.message,
-            email: transaction.customer_email
-          });
-        }
-      }
-    }
-
-    return res.json({ success: true });
-  } catch (err) {
-    logger.error('❌ Webhook handler error', err.message);
-    return res.status(500).json({ error: 'Internal server error' });
+  /* 3. Ambil transaksi di DB */
+  const transaction = await Transaction.findOne({ payment_id, invoice_id });
+  if (!transaction) {
+    logger.error('❌ Transaction not found');
+    return res.status(404).json({ error: 'Transaction not found' });
   }
+
+  /* 3‑bis. VALIDASI TAMBAHAN (Checklist #3) */
+  const amountUSD = parseFloat(transaction.price_amount);
+  if (isNaN(amountUSD) || amountUSD <= 0) {
+    logger.error({ event: 'invalid_amount', payment_id, price_amount: transaction.price_amount });
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
+  if (!transaction.telegram_id) {
+    logger.error({ event: 'missing_telegram_id', payment_id });
+    return res.status(400).json({ error: 'Missing telegram_id in transaction' });
+  }
+
+  /* 4. Cegah re‑process */
+  if (transaction.payment_status === 'finished') {
+    logger.warn('⚠️ Webhook processed previously.');
+    return res.json({ success: true, message: 'Already processed' });
+  }
+
+  /* 5. Update transaksi */
+  transaction.payment_status = payment_status;
+  transaction.pay_address    = pay_address;
+  transaction.pay_currency   = pay_currency;
+  transaction.updated_at     = new Date();
+  await transaction.save();
+
+  logger.info({
+    event: 'transaction_updated',
+    invoice_id,
+    status: payment_status,
+    time: transaction.updated_at
+  });
+
+  /* 6. Jika pembayaran selesai → refill & notifikasi */
+  if (payment_status === 'finished') {
+    const bonusPercent = parseInt(process.env.BONUS_PERCENTAGE || '0', 10);
+    const totalUSD     = amountUSD + (amountUSD * bonusPercent / 100);
+    const creditsAdd   = Math.round(totalUSD * 1000); // $1 = 1000 credits
+
+    /* 6a. Tambah kredit di MGCBot */
+    try {
+      const refillRes = await axios.post(
+        `${MGC_API_URL}/api/credit/refill`,
+        {
+          telegramId : transaction.telegram_id,
+          amount     : creditsAdd,
+          method     : 'NowPayments'
+        },
+        { headers: { 'x-internal-api-key': INTERNAL_KEY, 'Content-Type': 'application/json' } }
+      );
+
+      logger.info({
+        event   : 'mgc_refill_success',
+        telegram: transaction.telegram_id,
+        credits : creditsAdd,
+        response: refillRes.data
+      });
+    } catch (err) {
+      logger.error({
+        event   : 'mgc_refill_failed',
+        telegram: transaction.telegram_id,
+        error   : err.response?.data || err.message
+      });
+    }
+
+    /* 6b. Notifikasi user */
+    try {
+      await sendTelegram(
+        transaction.telegram_id,
+        `✅ Top‑up *$${amountUSD.toFixed(2)}* (+${bonusPercent}%) berhasil!\n` +
+        `💳 Credits bertambah *${creditsAdd.toLocaleString('en-US')}*`
+      );
+    } catch {/**/}
+
+    /* 6c. Kirim saldo terbaru */
+    try {
+      const balRes = await axios.get(
+        `${MGC_API_URL}/api/user/${transaction.telegram_id}/balance`,
+        { headers: { 'x-internal-api-key': INTERNAL_KEY } }
+      );
+      const creditsNow = balRes.data.credits ?? balRes.data.balance ?? 0;
+
+      await sendTelegram(
+        transaction.telegram_id,
+        `🏦 Saldo terbaru Anda: *${creditsNow.toLocaleString('en-US')}* credits`,
+      );
+    } catch {/**/}
+
+    /* 6d. Notifikasi admin */
+    if (process.env.TELEGRAM_ADMIN_ID) {
+      sendTelegram(
+        process.env.TELEGRAM_ADMIN_ID,
+        `💸 User ${transaction.telegram_id} top‑up $${amountUSD.toFixed(2)} → ` +
+        `+${creditsAdd.toLocaleString('en-US')} credits`
+      ).catch(()=>{});
+    }
+  }
+
+  return res.json({ success: true });
 };
