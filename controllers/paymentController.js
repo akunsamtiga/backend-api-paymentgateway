@@ -50,14 +50,18 @@ exports.createInvoiceFromTelegram = async (req, res) => {
     // }
 
     const payload = {
-      price_amount      : nominal,
+      price_amount      : nominal > 25 ? nominal : nominal + 0.7, // Add $0.7 fee if below $25
       price_currency    : 'USD',
       order_id          : orderId,
       order_description : `Telegram Top up`,
       ipn_callback_url  : `${BASE_URL}/api/payment/webhook`,
-      customer_email    : emailSafe,
-      is_fee_paid_by_user: true
+      customer_email    : emailSafe
     };
+
+    // Only add is_fee_paid_by_user if nominal is above $25
+    if (nominal > 25) {
+      payload.is_fee_paid_by_user = true;
+    }
 
     const invoiceResponse = await axios.post(
       'https://api.nowpayments.io/v1/invoice',
