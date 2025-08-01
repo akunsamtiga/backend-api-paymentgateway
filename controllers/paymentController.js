@@ -42,18 +42,18 @@ exports.createInvoiceFromTelegram = async (req, res) => {
 
     /* ---------- Create invoice in NowPayments ---------- */
     const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
-    const orderId  = `XSID-${uuidv4().slice(0, 8)}`;
+    const orderId  = `MGC-${uuidv4().slice(0, 8)}`;
 
     let emailSafe = user.email;
-    if (!emailSafe || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailSafe)) {
-      emailSafe = `${user.xsid.replace(/[^a-zA-Z0-9]/g, '')}@gmail.com`.slice(0, 50);
-    }
+    // if (!emailSafe || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailSafe)) {
+    //   emailSafe = `${user.xsid.replace(/[^a-zA-Z0-9]/g, '')}@gmail.com`.slice(0, 50);
+    // }
 
     const payload = {
       price_amount      : nominal,
       price_currency    : 'USD',
       order_id          : orderId,
-      order_description : `Top up XSID ${user.xsid}`,
+      order_description : `Telegram Top up`,
       ipn_callback_url  : `${BASE_URL}/api/payment/webhook`,
       customer_email    : emailSafe
     };
@@ -74,7 +74,6 @@ exports.createInvoiceFromTelegram = async (req, res) => {
     await Transaction.create({
       user_id           : 'telegram',
       telegram_id,
-      xsid              : user.xsid,
       payment_id        : invoice.token_id,
       invoice_id        : invoice.id,
       order_id          : invoice.order_id,
@@ -92,7 +91,6 @@ exports.createInvoiceFromTelegram = async (req, res) => {
     logger.info({
       event       : 'telegram_invoice_created',
       telegram_id,
-      xsid        : user.xsid,
       invoice_id  : invoice.id,
       nominal
     });
