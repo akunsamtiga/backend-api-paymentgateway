@@ -18,6 +18,7 @@ const transactionSchema = new mongoose.Schema({
   updated_at: Date,
   telegram_id: String,
   xsid: String,
+  extra_percent: { type: Number, default: 0 },
 });
 
 transactionSchema.index({ invoice_id: 1 });

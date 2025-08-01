@@ -12,13 +12,13 @@ const INTERNAL_KEY  = process.env.INTERNAL_MASTER_KEY;
 
 /* ────────────────────────────────────────────────────────── */
 exports.handleWebhook = async (req, res) => {
-  /* 1. Verifikasi HMAC header (NowPayments) */
+  /* 1. Verifikasi HMAC header (NowPayments) */
   if (!verifySignature(req)) {
     logger.warn('❌ Invalid webhook signature');
     return res.status(401).json({ error: 'Unauthorized signature' });
   }
 
-  /* 2. Parse payload */
+  /* 2. Parse payload */
   const payload = JSON.parse(req.body.toString());
   const {
     payment_id,
@@ -30,14 +30,14 @@ exports.handleWebhook = async (req, res) => {
 
   logger.info({ event: 'webhook_received', payment_id, invoice_id, payment_status });
 
-  /* 3. Ambil transaksi di DB */
+  /* 3. Ambil transaksi di DB */
   const transaction = await Transaction.findOne({ payment_id, invoice_id });
   if (!transaction) {
     logger.error('❌ Transaction not found');
     return res.status(404).json({ error: 'Transaction not found' });
   }
 
-  /* 3‑bis. VALIDASI TAMBAHAN (Checklist #3) */
+  /* 3‑bis. VALIDASI TAMBAHAN (Checklist #3) */
   const amountUSD = parseFloat(transaction.price_amount);
   if (isNaN(amountUSD) || amountUSD <= 0) {
     logger.error({ event: 'invalid_amount', payment_id, price_amount: transaction.price_amount });
@@ -48,13 +48,13 @@ exports.handleWebhook = async (req, res) => {
     return res.status(400).json({ error: 'Missing telegram_id in transaction' });
   }
 
-  /* 4. Cegah re‑process */
+  /* 4. Cegah re‑process */
   if (transaction.payment_status === 'finished') {
     logger.warn('⚠️ Webhook processed previously.');
     return res.json({ success: true, message: 'Already processed' });
   }
 
-  /* 5. Update transaksi */
+  /* 5. Update transaksi */
   transaction.payment_status = payment_status;
   transaction.pay_address    = pay_address;
   transaction.pay_currency   = pay_currency;
@@ -68,20 +68,21 @@ exports.handleWebhook = async (req, res) => {
     time: transaction.updated_at
   });
 
-  /* 6. Jika pembayaran selesai → refill & notifikasi */
+  /* 6. Jika pembayaran selesai → refill & notifikasi */
   if (payment_status === 'finished') {
     const bonusPercent = parseInt(process.env.BONUS_PERCENTAGE || '0', 10);
     const totalUSD     = amountUSD + (amountUSD * bonusPercent / 100);
     const creditsAdd   = Math.round(totalUSD * 1000); // $1 = 1000 credits
 
-    /* 6a. Tambah kredit di MGCBot */
+    /* 6a. Tambah kredit di MGCBot */
     try {
       const refillRes = await axios.post(
         `${MGC_API_URL}/api/credit/refill`,
         {
-          telegramId : transaction.telegram_id,
-          amount     : creditsAdd,
-          method     : 'NowPayments'
+          telegramId    : transaction.telegram_id,
+          amount        : creditsAdd,
+          method        : 'NowPayments',
+          extra_percent : transaction.extra_percent || 0
         },
         { headers: { 'x-internal-api-key': INTERNAL_KEY, 'Content-Type': 'application/json' } }
       );
@@ -100,7 +101,7 @@ exports.handleWebhook = async (req, res) => {
       });
     }
 
-    /* 6b. Notifikasi user */
+    /* 6b. Notifikasi user */
     try {
       await sendTelegram(
         transaction.telegram_id,
@@ -109,7 +110,7 @@ exports.handleWebhook = async (req, res) => {
       );
     } catch {/**/}
 
-    /* 6c. Kirim saldo terbaru */
+    /* 6c. Kirim saldo terbaru */
     try {
       const balRes = await axios.get(
         `${MGC_API_URL}/api/user/${transaction.telegram_id}/balance`,
@@ -123,7 +124,7 @@ exports.handleWebhook = async (req, res) => {
       );
     } catch {/**/}
 
-    /* 6d. Notifikasi admin */
+    /* 6d. Notifikasi admin */
     if (process.env.TELEGRAM_ADMIN_ID) {
       sendTelegram(
         process.env.TELEGRAM_ADMIN_ID,

@@ -30,7 +30,7 @@ exports.createInvoice = async (req, res) => {
 
 exports.createInvoiceFromTelegram = async (req, res) => {
   try {
-    const { telegram_id, nominal } = req.body;
+    const { telegram_id, nominal, extra_percent } = req.body;
     if (!telegram_id || !nominal) {
       return res.status(400).json({ error: 'telegram_id and nominal must be filled in' });
     }
@@ -84,6 +84,7 @@ exports.createInvoiceFromTelegram = async (req, res) => {
       invoice_url       : invoice.invoice_url,
       customer_email    : emailSafe,
       payment_status    : 'waiting',
+      extra_percent     : extra_percent || 0,
       created_at        : new Date(),
       updated_at        : new Date()
     });
