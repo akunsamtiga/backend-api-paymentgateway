@@ -25,14 +25,15 @@ exports.handleWebhook = async (req, res) => {
     invoice_id,
     payment_status,
     pay_address,
-    pay_currency
+    pay_currency,
+    order_id
   } = payload;
 
   console.log(payload);
-  logger.info({ event: 'webhook_received', payment_id, invoice_id, payment_status }.toString());
+  logger.info({ event: 'webhook_received', payment_id, invoice_id, payment_status });
 
   /* 3. Get transaction from DB */
-  const transaction = await Transaction.findOne({ payment_id, invoice_id });
+  const transaction = await Transaction.findOne({ order_id });
   if (!transaction) {
     logger.error('❌ Transaction not found');
     return res.status(404).json({ error: 'Transaction not found' });
@@ -71,8 +72,7 @@ exports.handleWebhook = async (req, res) => {
 
   /* 6. If payment finished → refill & notification */
   if (payment_status === 'finished') {
-    const bonusPercent = parseInt(process.env.BONUS_PERCENTAGE || '0', 10);
-    const totalUSD     = amountUSD + (amountUSD * bonusPercent / 100);
+    const totalUSD     = amountUSD + (amountUSD);
     const creditsAdd   = Math.round(totalUSD * 1000); // $1 = 1000 credits
 
     /* 6a. Add credits in MGCBot */
@@ -106,8 +106,7 @@ exports.handleWebhook = async (req, res) => {
     try {
       await sendTelegram(
         transaction.telegram_id,
-        `✅ Top-up *$${amountUSD.toFixed(2)}* (+${bonusPercent}%) successful!\n` +
-        `💳 Credits added *${creditsAdd.toLocaleString('en-US')}*`
+        `✅ Top-up *$${amountUSD.toFixed(2)}* (+${transaction.extra_percent}%) successful!`
       );
     } catch {/**/}
 
@@ -121,18 +120,18 @@ exports.handleWebhook = async (req, res) => {
 
       await sendTelegram(
         transaction.telegram_id,
-        `🏦 Your latest balance: *${creditsNow.toLocaleString('en-US')}* credits`,
+        `🏦 Your current balance: *${creditsNow.toLocaleString('en-US')}* credits`,
       );
     } catch {/**/}
 
     /* 6d. Notify admin */
-    if (process.env.TELEGRAM_ADMIN_ID) {
-      sendTelegram(
-        process.env.TELEGRAM_ADMIN_ID,
-        `💸 User ${transaction.telegram_id} top-up $${amountUSD.toFixed(2)} → ` +
-        `+${creditsAdd.toLocaleString('en-US')} credits`
-      ).catch(()=>{});
-    }
+    // if (process.env.TELEGRAM_ADMIN_ID) {
+    //   sendTelegram(
+    //     process.env.TELEGRAM_ADMIN_ID,
+    //     `💸 User ${transaction.telegram_id} top-up $${amountUSD.toFixed(2)} → ` +
+    //     `+${creditsAdd.toLocaleString('en-US')} credits`
+    //   ).catch(()=>{});
+    // }
   }
 
   return res.json({ success: true });
