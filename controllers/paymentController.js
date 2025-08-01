@@ -50,7 +50,7 @@ exports.createInvoiceFromTelegram = async (req, res) => {
     // }
 
     const payload = {
-      price_amount      : nominal,
+      price_amount      : nominal + 0.7, // Add $0.7 fee to invoice amount
       price_currency    : 'USD',
       order_id          : orderId,
       order_description : `Telegram Top up`,
@@ -78,7 +78,7 @@ exports.createInvoiceFromTelegram = async (req, res) => {
       invoice_id        : invoice.id,
       order_id          : invoice.order_id,
       order_description : invoice.order_description,
-      price_amount      : invoice.price_amount,
+      price_amount      : nominal, // Store original amount for refill calculation
       price_currency    : invoice.price_currency,
       invoice_url       : invoice.invoice_url,
       customer_email    : emailSafe,
