@@ -1,8 +1,8 @@
 {
-  "name": "tes2",
+  "name": "sanzypay-payment-gateway",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Crypto payment gateway system based on NowPayments.io with Telegram Bot integration",
+  "main": "app.js",
   "scripts": {
     "webhook": "node webhooksimulation/signature.js",
     "start": "node app.js",

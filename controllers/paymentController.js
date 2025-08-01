@@ -32,15 +32,15 @@ exports.createInvoiceFromTelegram = async (req, res) => {
   try {
     const { telegram_id, nominal, extra_percent } = req.body;
     if (!telegram_id || !nominal) {
-      return res.status(400).json({ error: 'telegram_id and nominal must be filled in' });
+      return res.status(400).json({ error: 'telegram_id and nominal are required' });
     }
 
     const user = await BotUser.findOne({ telegram_id });
     if (!user) {
-      return res.status(404).json({ error: 'User has not bind XSID' });
+      return res.status(404).json({ error: 'User has not bound XSID' });
     }
 
-    /* ---------- Membuat invoice di NowPayments ---------- */
+    /* ---------- Create invoice in NowPayments ---------- */
     const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
     const orderId  = `XSID-${uuidv4().slice(0, 8)}`;
 

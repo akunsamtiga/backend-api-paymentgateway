@@ -14,7 +14,7 @@ const sendTelegram = async (chatId, text) => {
   }
 
   if (!chatId || !text) {
-    return console.warn('⚠️ chatId and text must be filled in to send a Telegram message');
+    return console.warn('⚠️ chatId and text must be provided to send a Telegram message');
   }
 
   try {

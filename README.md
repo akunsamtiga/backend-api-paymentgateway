@@ -1,24 +1,24 @@
 
 # 💸 SanzyPay — Payment Gateway via NowPayments + Telegram Bot
 
-SanzyPay adalah sistem gateway pembayaran kripto berbasis [NowPayments.io](https://nowpayments.io), terintegrasi dengan Bot Telegram dan backend Node.js tanpa autentikasi.
+SanzyPay is a crypto payment gateway system based on [NowPayments.io](https://nowpayments.io), integrated with Telegram Bot and Node.js backend without authentication.
 
 ---
 
-## 🚀 Fitur Utama
+## 🚀 Main Features
 
-- ✅ Pembuatan invoice (web/telegram)
-- ✅ Integrasi pembayaran kripto via NowPayments
-- ✅ Webhook otomatis: update status + notifikasi Telegram + refill XSID
-- ✅ Dashboard Admin (tanpa login)
-- ✅ Riwayat transaksi publik
-- ✅ Statistik transaksi
-- ✅ Email notifikasi sukses
-- ✅ Tanpa autentikasi — cocok untuk layanan publik/Telegram Bot
+- ✅ Invoice creation (web/telegram)
+- ✅ Crypto payment integration via NowPayments
+- ✅ Automatic webhook: status update + Telegram notification + XSID refill
+- ✅ Admin Dashboard (no login required)
+- ✅ Public transaction history
+- ✅ Transaction statistics
+- ✅ Success email notifications
+- ✅ No authentication — suitable for public services/Telegram Bot
 
 ---
 
-## 📦 Teknologi
+## 📦 Technology
 
 - **Backend:** Express.js + MongoDB
 - **Bot:** `node-telegram-bot-api`
@@ -29,9 +29,9 @@ SanzyPay adalah sistem gateway pembayaran kripto berbasis [NowPayments.io](https
 
 ---
 
-## ⚙️ Instalasi
+## ⚙️ Installation
 
-1. Clone repo ini:
+1. Clone this repo:
 
 ```bash
 git clone https://github.com/namamu/sanzypay.git
@@ -44,7 +44,7 @@ cd sanzypay
 npm install
 ```
 
-3. Buat file `.env`:
+3. Create `.env` file:
 
 ```env
 NOWPAYMENTS_API_KEY=xxx
@@ -58,13 +58,13 @@ XSID_API_URL=https://srxsnet.com/xs
 BASE_URL=http://localhost:3000
 ```
 
-4. Jalankan backend:
+4. Run backend:
 
 ```bash
 npm run dev
 ```
 
-5. Jalankan bot:
+5. Run bot:
 
 ```bash
 node telegram/bot.js
@@ -72,38 +72,38 @@ node telegram/bot.js
 
 ---
 
-## 🌐 API Endpoint
+## 🌐 API Endpoints
 
-Semua endpoint bersifat **publik** dan **tidak memerlukan autentikasi**.
+All endpoints are **public** and **require no authentication**.
 
-| Metode | Endpoint                       | Deskripsi                           |
-| ------ | ------------------------------ | ----------------------------------- |
-| POST   | `/api/payment/create`          | Buat invoice manual (via panel/web) |
-| POST   | `/api/payment/telegram-create` | Buat invoice dari Telegram bot      |
-| POST   | `/api/payment/webhook`         | Webhook dari NowPayments            |
-| GET    | `/api/payment/history`         | Lihat riwayat transaksi             |
-| GET    | `/api/payment/admin/stats`     | Statistik umum                      |
-| GET    | `/api/payment/:invoice_id`     | Detail invoice                      |
+| Method | Endpoint                       | Description                        |
+| ------ | ------------------------------ | ---------------------------------- |
+| POST   | `/api/payment/create`          | Create manual invoice (via panel) |
+| POST   | `/api/payment/telegram-create` | Create invoice from Telegram bot   |
+| POST   | `/api/payment/webhook`         | Webhook from NowPayments           |
+| GET    | `/api/payment/history`         | View transaction history           |
+| GET    | `/api/payment/admin/stats`     | General statistics                 |
+| GET    | `/api/payment/:invoice_id`     | Invoice details                    |
 
-> 📎 Dokumentasi lengkap endpoint ada di: `docs/api.md`
+> 📎 Complete endpoint documentation available at: `docs/api.md`
 
 ---
 
 ## 🤖 Telegram Bot
 
-Bot menggunakan polling & mendukung:
+Bot uses polling & supports:
 
-* `/start` — sambutan
-* `/bind xsid-xxx` — hubungkan Telegram ke akun XSID
-* `/topup <nominal>` — buat invoice langsung via NowPayments
+* `/start` — welcome message
+* `/bind xsid-xxx` — connect Telegram to XSID account
+* `/topup <amount>` — create invoice directly via NowPayments
 
 ---
 
 ## 🔐 Webhook Signature (NowPayments)
 
-Untuk keamanan, webhook divalidasi dengan `x-nowpayments-sig` (HMAC-SHA512).
+For security, webhook is validated with `x-nowpayments-sig` (HMAC-SHA512).
 
-Cek contoh uji coba signature manual:
+Check manual signature test example:
 
 ```bash
 node tesSignature/signature_finished.js
@@ -111,18 +111,18 @@ node tesSignature/signature_finished.js
 
 ---
 
-## 📊 Dashboard Admin
+## 📊 Admin Dashboard
 
-Frontend dashboard disediakan (tanpa login) untuk:
+Frontend dashboard provided (no login) for:
 
-* Melihat statistik
-* Membuat invoice
-* Riwayat transaksi
-* Lihat detail invoice
+* View statistics
+* Create invoices
+* Transaction history
+* View invoice details
 
 ---
 
-## 📁 Struktur Folder
+## 📁 Folder Structure
 
 ```
 .
@@ -143,13 +143,13 @@ Frontend dashboard disediakan (tanpa login) untuk:
 
 ---
 
-## 📞 Kontak
+## 📞 Contact
 
-Pengembang: **Sanzy ([sanzyxsid@gmail.com](mailto:sanzyxsid@gmail.com))**
-Proyek freelance via Telegram: `@SanzyXSID`
+Developer: **Sanzy ([sanzyxsid@gmail.com](mailto:sanzyxsid@gmail.com))**
+Freelance projects via Telegram: `@SanzyXSID`
 
 ---
 
-## 📝 Lisensi
+## 📝 License
 
-MIT License — bebas digunakan & dimodifikasi.
+MIT License — free to use & modify.
