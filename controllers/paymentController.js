@@ -50,12 +50,13 @@ exports.createInvoiceFromTelegram = async (req, res) => {
     // }
 
     const payload = {
-      price_amount      : nominal + 0.7, // Add $0.7 fee to invoice amount
+      price_amount      : nominal,
       price_currency    : 'USD',
       order_id          : orderId,
       order_description : `Telegram Top up`,
       ipn_callback_url  : `${BASE_URL}/api/payment/webhook`,
-      customer_email    : emailSafe
+      customer_email    : emailSafe,
+      is_fee_paid_by_user: true
     };
 
     const invoiceResponse = await axios.post(
