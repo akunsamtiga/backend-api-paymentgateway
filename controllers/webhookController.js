@@ -10,6 +10,10 @@ const BACKEND_URL   = process.env.BASE_URL      || 'http://localhost:3000';
 const MGC_API_URL   = process.env.MAIN_API_URL  || 'https://mgc.bot';
 const INTERNAL_KEY  = process.env.INTERNAL_MASTER_KEY;
 
+const escapeMarkdown = (text) => {
+  return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\$&');
+};
+
 /* ────────────────────────────────────────────────────────── */
 exports.handleWebhook = async (req, res) => {
   /* 1. Verify HMAC header (NowPayments) */
@@ -72,8 +76,7 @@ exports.handleWebhook = async (req, res) => {
 
   /* 6. If payment finished → refill & notification */
   if (payment_status === 'finished') {
-    const totalUSD     = amountUSD + (amountUSD);
-    const creditsAdd   = Math.round(totalUSD * 1000); // $1 = 1000 credits
+    const creditsAdd   = Math.round(amountUSD * 1000); // $1 = 1000 credits
 
     /* 6a. Add credits in MGCBot */
     try {
@@ -106,7 +109,7 @@ exports.handleWebhook = async (req, res) => {
     try {
       await sendTelegram(
         transaction.telegram_id,
-        `✅ Top-up *$${amountUSD.toFixed(2)}* (+${transaction.extra_percent}%) successful!`
+        `✅ Top-up *$${escapeMarkdown(amountUSD.toFixed(2))}* \(\+${transaction.extra_percent}%\) successful!`
       );
     } catch {/**/}
 
@@ -120,7 +123,7 @@ exports.handleWebhook = async (req, res) => {
 
       await sendTelegram(
         transaction.telegram_id,
-        `🏦 Your current balance: *${creditsNow.toLocaleString('en-US')}* credits`,
+        `🏦 Your current balance: *${escapeMarkdown(creditsNow.toLocaleString('en-US'))}* credits`,
       );
     } catch {/**/}
 

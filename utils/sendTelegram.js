@@ -19,7 +19,7 @@ const sendTelegram = async (chatId, text) => {
 
   try {
     const url = `https://api.telegram.org/bot${token}/sendMessage`;
-    const payload = { chat_id: chatId, text };
+    const payload = { chat_id: chatId, text, parse_mode: 'Markdown' };
 
     const res = await axios.post(url, payload);
     console.log(`📨 Telegram sent to ${chatId}`);
