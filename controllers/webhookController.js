@@ -28,6 +28,7 @@ exports.handleWebhook = async (req, res) => {
     pay_currency
   } = payload;
 
+  console.log(payload);
   logger.info({ event: 'webhook_received', payment_id, invoice_id, payment_status }.toString());
 
   /* 3. Get transaction from DB */
