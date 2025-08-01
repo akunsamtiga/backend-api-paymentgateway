@@ -28,7 +28,7 @@ exports.handleWebhook = async (req, res) => {
     pay_currency
   } = payload;
 
-  logger.info({ event: 'webhook_received', payment_id, invoice_id, payment_status });
+  logger.info({ event: 'webhook_received', payment_id, invoice_id, payment_status }.toString());
 
   /* 3. Get transaction from DB */
   const transaction = await Transaction.findOne({ payment_id, invoice_id });
